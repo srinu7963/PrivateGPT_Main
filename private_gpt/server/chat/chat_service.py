@@ -19,6 +19,7 @@ from private_gpt.components.vector_store.vector_store_component import (
 )
 from private_gpt.open_ai.extensions.context_filter import ContextFilter
 from private_gpt.server.chunks.chunks_service import Chunk
+from private_gpt.settings.settings import Settings
 
 
 class Completion(BaseModel):
@@ -74,6 +75,7 @@ class ChatService:
         vector_store_component: VectorStoreComponent,
         embedding_component: EmbeddingComponent,
         node_store_component: NodeStoreComponent,
+        settings: Settings,
     ) -> None:
         self.llm_service = llm_component
         self.vector_store_component = vector_store_component
@@ -91,6 +93,7 @@ class ChatService:
             service_context=self.service_context,
             show_progress=True,
         )
+        self.default_context_template = settings.rag.default_context_template
 
     def _chat_engine(
         self,
@@ -99,6 +102,10 @@ class ChatService:
         context_filter: ContextFilter | None = None,
     ) -> BaseChatEngine:
         if use_context:
+            if self.default_context_template is not None:
+                context_template = self.default_context_template
+            else:
+                context_template = None
             vector_index_retriever = self.vector_store_component.get_retriever(
                 index=self.index, context_filter=context_filter
             )
@@ -109,6 +116,7 @@ class ChatService:
                 node_postprocessors=[
                     MetadataReplacementPostProcessor(target_metadata_key="window"),
                 ],
+                context_template=context_template,
             )
         else:
             return SimpleChatEngine.from_defaults(
